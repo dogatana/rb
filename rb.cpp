@@ -6,7 +6,6 @@
 #include <io.h>
 #include <windows.h>
 
-
 // search the script from RBPATH or PATH
 char *search_file(char *name)
 {
@@ -67,8 +66,8 @@ char *get_incdir(char *name)
 	return path;
 }
 
+void exec_script(char *script_name, int argc, char **argv, bool show, bool win)
 // execute the script
-void exec_script(char *script_name, int argc, char **argv, bool show)
 {
 	char	*name;
 	
@@ -83,12 +82,13 @@ void exec_script(char *script_name, int argc, char **argv, bool show)
 	}
 		
 	char	exec[4096];
-	sprintf(exec, "ruby -I%s %s", get_incdir(name), name);
+	sprintf(exec, "ruby%s -I'%s' '%s'", (win? "w": ""), get_incdir(name), name);
 	while (--argc) {
 		strcat(exec, " ");
 		strcat(exec, *++argv);
 	}
-	
+	//printf("# exec %s\n", exec);
+	//exit(1);
 	if (show) {
 		puts(exec);		// show but not execute
 	} else {
@@ -99,9 +99,10 @@ void exec_script(char *script_name, int argc, char **argv, bool show)
 void usage()
 {
 	puts(
-		"== rb v1.0 ==\n"
-		"usage: rb [-show] script[.rb] [args]\n\n"
-		"-show: shows the command line format without execution.\n\n"
+		"== rb v1.2 ==\n"
+		"usage: rb [-s|-w] script[.rb] [args]\n\n"
+		"-s: shows the command line format without execution.\n"
+		"-w: use rubyw.exe instead of ruby.exe.\n\n"
 		"* Envrionmental vaiable, RBPATH or PATH, is used to search the script file.\n"
 		"* Or you can just rename rb.exe to <script>.exe to invoke the script file.\n"
 	);
@@ -111,32 +112,59 @@ int main(int argc, char **argv)
 {
 	char	name[_MAX_PATH];
 	bool	show = false;
+	bool	win = false;
+	bool	cmd = true;
 	
 	// change name of this exectable to .rb script file
 	strcpy(name, get_scriptname(argv[0]));
 
 	// rb.exe was used to invoke ruby script
 	if (!stricmp(name, "rb.rb")) {
-		if (argc > 1 && !stricmp(argv[1], "-show")) {
-			show = true;
-			argc--;
-			argv++;
-		}
-		if (argc == 1) {
-			usage();
-			puts("no script file was specified.");
-			exit(1);
-		}
-		strcpy(name, argv[1]);
-		if (strlen(name) < 3 || stricmp(name + strlen(name) - 3, ".rb")) {
-			strcat(name, ".rb");
-		}
+		cmd = false;
 		argc--;
 		argv++;
-	} else if (argc > 1 && !stricmp(argv[1], "-show")) {
-		argc--;
-		argv++;
-		show = true;
 	}
-	exec_script(name, argc, argv, show);
+	while (argc && argv[0][0] == '-') {
+		char *opt = *argv + 1;
+		while (*opt) {
+			switch (*opt++) {
+			case 's':
+			case 'S':
+				show = true;
+				break;
+			case 'w':
+			case 'W':
+				win = true;
+				break;
+			default:
+				usage();
+				exit(1);
+			}
+		}
+		argc--;
+		argv++;
+	}
+	if (!argc) {
+		usage();
+		puts("no script file was specified.");
+		exit(1);
+	}
+	strcpy(name, *argv);
+	if (strlen(name) < 3 || stricmp(name + strlen(name) - 3, ".rb")) {
+		strcat(name, ".rb");
+	}
+	
+	if (cmd && (*argv)[strlen(*argv) - 1] == 'w') {
+		win = true;
+	}
+	
+//	printf("# name: %s\n", name);
+//	for (int i = 0; i < argc; i++) {
+//		printf("%d: %s\n", i, *argv++);
+//	}
+//	printf("show: %s\n", show ? "true": "false");
+//	printf("win: %s\n", win? "true": "false");
+//	printf("cmd: %s\n", cmd? "true": "false");
+//	
+	exec_script(name, argc, argv, show, win);
 }
